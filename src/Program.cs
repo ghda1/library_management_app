@@ -60,11 +60,52 @@ public class User : CommonFeatures
 
     }
 }
+public interface INotificationService
+{
+    public void SendNotificationOnSucess(string name);
+    public void SendNotificationOnFailure(string name);
+}
+// create classes : EmailNotificationService, SMSNotificationService
+// both classes inheris from INotificationService
+// inject INotificationService in library 
+class EmailNotificationService : INotificationService
+{
+    public void SendNotificationOnSucess(string name)
+    {
+        Console.WriteLine($"Hello, a new user/book name '{name}' has been successfully added to the Library. If you have any queries or feedback, please contact our support team at support@library.com.");
+
+    }
+    public void SendNotificationOnFailure(string name)
+    {
+        Console.WriteLine($"We encountered an issue adding '{name}'. Please review the input data. For more help, visit our FAQ at library.com/faq.");
+
+    }
+}
+
+class SMSNotificationService : INotificationService
+{
+    public void SendNotificationOnSucess(string name)
+    {
+        Console.WriteLine($"User/Book '{name}' added to Library. Thank you!");
+
+    }
+    public void SendNotificationOnFailure(string name)
+    {
+        Console.WriteLine($"Error adding User/Book '{name}'. Please email support@library.com.");
+
+    }
+}
 
 public class Library
 {
-    private readonly List<User> users = new List<User>();
-    private readonly List<Book> books = new List<Book>();
+    public readonly List<User> users = new List<User>();
+    public readonly List<Book> books = new List<Book>();
+    public INotificationService INotificationService;
+
+    public Library(INotificationService notificationService)
+    {
+        INotificationService = notificationService;
+    }
     public void FindBook(string title)
     {
         var foundBook = books.FirstOrDefault(book => book.TitleOrName.Contains(title, StringComparison.OrdinalIgnoreCase));
@@ -90,21 +131,21 @@ public class Library
     {
         if (books.Any(book => book.TitleOrName == newBook.TitleOrName))
         {
-            Console.WriteLine($"This book is already exist.");
+            INotificationService.SendNotificationOnFailure(newBook.TitleOrName);
             return;
         }
         books.Add(newBook);
-        Console.WriteLine($"Book '{newBook.TitleOrName}' added to the library.");
+        INotificationService.SendNotificationOnSucess(newBook.TitleOrName);
     }
     public void AddUser(User newUser)
     {
         if (users.Any(user => user.TitleOrName == newUser.TitleOrName))
         {
-            Console.WriteLine($"This user is already exist.");
+            INotificationService.SendNotificationOnFailure(newUser.TitleOrName);
             return;
         }
         users.Add(newUser);
-        Console.WriteLine($"User '{newUser.TitleOrName}' added to the library.");
+        INotificationService.SendNotificationOnSucess(newUser.TitleOrName);
     }
     public void DeleteBook(Guid id)
     {
@@ -128,37 +169,28 @@ public class Library
         Console.WriteLine($"User '{foundUser.TitleOrName}' removed from the library.");
         users.Remove(foundUser);
     }
-    public void DisplayAllBooks()
+    public void Display<T>(List<T> list) where T : CommonFeatures
     {
-        if (books.Count == 0)
+        if (list.Count == 0)
         {
-            Console.WriteLine($"The List of books is empty.");
+            Console.WriteLine($"The List is empty.");
             return;
         }
-        foreach (var book in books)
+        foreach (var item in list)
         {
-            Console.WriteLine($"Book ID: {book.Id}, Book Title: {book.TitleOrName}, Created Date: {book.CreatedDate}.");
+            Console.WriteLine($"ID: {item.Id}, Name: {item.TitleOrName}, Created Date: {item.CreatedDate}.");
         }
     }
-    public void DisplayAllUsers()
+
+    public List<Book> GetBooks()
     {
-        if (users.Count == 0)
-        {
-            Console.WriteLine($"The List of users is empty.");
-            return;
-        }
-        foreach (var user in users)
-        {
-            Console.WriteLine($"User ID: {user.Id}, User Name: {user.TitleOrName}, Created Date: {user.CreatedDate}.");
-        }
-    }
-    public List<Book> GetBooks(int pageNumber = 1, int limit = 3)
-    {
-        return books.OrderByDescending(book => book.CreatedDate).Skip((pageNumber - 1) * limit).Take(limit).ToList();
+        var paginationList = Utils.Pagination(books, 1, 3);
+        return paginationList.OrderByDescending(book => book.CreatedDate).ToList();
     }
     public List<User> GetUsers(int pageNumber = 1, int limit = 3)
     {
-        return users.OrderByDescending(user => user.CreatedDate).Skip((pageNumber - 1) * limit).Take(limit).ToList();
+        var paginationList = Utils.Pagination(users, 1, 3);
+        return paginationList.OrderByDescending(user => user.CreatedDate).ToList();
     }
 }
 
@@ -166,7 +198,10 @@ internal class Program
 {
     private static void Main()
     {
-        Library libraryManager = new Library();
+        EmailNotificationService emailService = new EmailNotificationService();
+        SMSNotificationService smsService = new SMSNotificationService();
+
+        Library libraryManager = new Library(smsService);
         var user1 = new User("Alice", new DateTime(2023, 1, 1));
         var user2 = new User("Bob", new DateTime(2023, 2, 1));
         var user3 = new User("Ian");
@@ -178,7 +213,8 @@ internal class Program
         libraryManager.FindUser(user1.TitleOrName);
         libraryManager.DeleteUser(user1.Id);
         libraryManager.FindUser(user1.TitleOrName);
-        libraryManager.DisplayAllUsers();
+        libraryManager.Display(libraryManager.users);
+
         var book1 = new Book("The Great Gatsby", new DateTime(2023, 1, 1));
         var book2 = new Book("1984", new DateTime(2023, 2, 1));
         var book3 = new Book("The Iliad");
@@ -190,18 +226,12 @@ internal class Program
         libraryManager.FindBook(book1.TitleOrName);
         libraryManager.DeleteBook(book1.Id);
         libraryManager.FindBook(book1.TitleOrName);
-        libraryManager.DisplayAllBooks();
+        libraryManager.Display(libraryManager.books);
 
         var getUsers = libraryManager.GetUsers();
-        foreach (var user in getUsers)
-        {
-            Console.WriteLine($"{user.TitleOrName}");
-        }
+        libraryManager.Display(getUsers);
 
         var getBooks = libraryManager.GetBooks();
-        foreach (var book in getBooks)
-        {
-            Console.WriteLine($"{book.TitleOrName}");
-        }
+        libraryManager.Display(getBooks);
     }
 }
