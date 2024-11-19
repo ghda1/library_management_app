@@ -65,9 +65,6 @@ public interface INotificationService
     public void SendNotificationOnSucess(string name);
     public void SendNotificationOnFailure(string name);
 }
-// create classes : EmailNotificationService, SMSNotificationService
-// both classes inheris from INotificationService
-// inject INotificationService in library 
 class EmailNotificationService : INotificationService
 {
     public void SendNotificationOnSucess(string name)
